@@ -2,7 +2,7 @@
 extern "C" void matrixWrite(const uint32_t *buf);
 extern "C" void matrixBegin();
 
-// Larger 6 row x 5 column digit patterns (using bits 0-4)
+// ========== DIGIT PATTERNS ==========
 const uint32_t digit0[] = {
     0x0E, // 01110
     0x11, // 10001
@@ -113,11 +113,92 @@ const uint32_t digit9[] = {
     0x00,
 };
 
-// Array of pointers to digit patterns
 const uint32_t *digits[10] = {
     digit0, digit1, digit2, digit3, digit4,
     digit5, digit6, digit7, digit8, digit9};
 
+// ========== WEATHER ANIMATIONS ==========
+const uint32_t Sunny[] = {
+    0xa0148120,
+    0x9c1c801,
+    0x409402c0,
+    0x2};
+const uint32_t Sunny2[] = {
+    0x804a0048,
+    0x39004e05,
+    0x2900d0,
+    0x9};
+const uint32_t *SunnyFrames[] = {Sunny, Sunny2};
+
+const uint32_t Cloudy[] = {
+    0x701c0000,
+    0x20211104,
+    0x7f0404,
+    0x0};
+const uint32_t Cloudy2[] = {
+    0xe0380000,
+    0x40422208,
+    0xfe0808,
+    0x0};
+const uint32_t Cloudy3[] = {
+    0xc0700000,
+    0x80844411,
+    0x1fc1010,
+    0x0};
+const uint32_t Cloudy4[] = {
+    0xe0380000,
+    0x40422208,
+    0xfe0808,
+    0x0};
+const uint32_t *CloudyFrames[] = {Cloudy, Cloudy2, Cloudy3, Cloudy4};
+
+const uint32_t Rainy[] = {
+    0x104301e0,
+    0x3f820210,
+    0x8a0510,
+    0x5};
+const uint32_t Rainy2[] = {
+    0x104301e0,
+    0x3f820210,
+    0x40a20140,
+    0x11};
+const uint32_t Rainy3[] = {
+    0x104301e0,
+    0x3f820210,
+    0x40280450,
+    0x14};
+const uint32_t *RainyFrames[] = {Rainy, Rainy2, Rainy3};
+
+const uint32_t Snowy[] = {
+    0x104301e0,
+    0x3f820210,
+    0x220040,
+    0x11};
+const uint32_t Snowy2[] = {
+    0x104301e0,
+    0x3f820210,
+    0x40080400,
+    0x4};
+const uint32_t Snowy3[] = {
+    0x104301e0,
+    0x3f820210,
+    0x800110,
+    0x1};
+const uint32_t *SnowyFrames[] = {Snowy, Snowy2, Snowy3};
+
+const uint32_t Foggy[] = {
+    0xdf8000,
+    0x3f600,
+    0xef8,
+    0x0};
+const uint32_t Foggy2[] = {
+    0xf78000,
+    0x3ee00,
+    0xdf8,
+    0x0};
+const uint32_t *FoggyFrames[] = {Foggy, Foggy2};
+
+// ========== DISPLAY FUNCTIONS ==========
 uint32_t displayBuffer[4];
 
 void displayNumber(int num)
@@ -130,21 +211,17 @@ void displayNumber(int num)
     int tens = num / 10;
     int ones = num % 10;
 
-    // Clear display buffer
     displayBuffer[0] = 0;
     displayBuffer[1] = 0;
     displayBuffer[2] = 0;
     displayBuffer[3] = 0;
 
-    // Reverse bits for horizontal mirroring (bits 0-4 for 5-bit width)
     auto reverseBits5 = [](uint32_t val) -> uint32_t
     {
         return ((val & 0x01) << 4) | ((val & 0x02) << 2) | (val & 0x04) |
                ((val & 0x08) >> 2) | ((val & 0x10) >> 4);
     };
 
-    // Build rows: tens digit in lower 5 bits, 1 space bit, ones digit in upper 5 bits
-    // Total: 5 + 1 + 5 = 11 bits per row (fits well in 13-bit columns)
     uint32_t row0 = reverseBits5(digits[tens][0] & 0x1F) | (reverseBits5(digits[ones][0] & 0x1F) << 6);
     uint32_t row1 = reverseBits5(digits[tens][1] & 0x1F) | (reverseBits5(digits[ones][1] & 0x1F) << 6);
     uint32_t row2 = reverseBits5(digits[tens][2] & 0x1F) | (reverseBits5(digits[ones][2] & 0x1F) << 6);
@@ -154,7 +231,6 @@ void displayNumber(int num)
     uint32_t row6 = 0;
     uint32_t row7 = 0;
 
-    // Pack into display buffer (8 rows x 13 columns)
     displayBuffer[0] = row0 | (row1 << 13) | (row2 << 26);
     displayBuffer[1] = (row2 >> 6) | (row3 << 7) | (row4 << 20);
     displayBuffer[2] = (row4 >> 12) | (row5 << 1) | (row6 << 14) | (row7 << 27);
@@ -163,6 +239,27 @@ void displayNumber(int num)
     matrixWrite(displayBuffer);
 }
 
+void playAnimation(const uint32_t *frames[], int frameCount, int totalDuration, int frameDelay)
+{
+    unsigned long startTime = millis();
+
+    while (millis() - startTime < totalDuration)
+    {
+        for (int i = 0; i < frameCount; i++)
+        {
+            matrixWrite(frames[i]);
+            delay(frameDelay);
+
+            // Check if we've exceeded the total duration
+            if (millis() - startTime >= totalDuration)
+            {
+                return;
+            }
+        }
+    }
+}
+
+// ========== SETUP AND LOOP ==========
 void setup()
 {
     matrixBegin();
@@ -171,15 +268,48 @@ void setup()
 
 void loop()
 {
+    // Get temperature and display for 5 seconds
     int temperature;
-    displayNumber(42);
-    bool ok = Bridge.call("get_temperature").result(temperature);
+    bool tempOk = Bridge.call("get_temperature").result(temperature);
 
-    if (ok)
+    if (tempOk)
     {
         if (temperature < 0)
             temperature = 0;
         displayNumber(temperature);
+        delay(5000); // Show temperature for 5 seconds
     }
-    delay(10000);
+
+    // Get weather conditions and play animation for 5 seconds
+    String weather_forecast;
+    bool condOk = Bridge.call("get_conditions").result(weather_forecast);
+
+    if (condOk)
+    {
+        if (weather_forecast == "Clear")
+        {
+            playAnimation(SunnyFrames, 2, 5000, 500);
+        }
+        else if (weather_forecast == "Clouds")
+        {
+            playAnimation(CloudyFrames, 4, 5000, 300);
+        }
+        else if (weather_forecast == "Rain" || weather_forecast == "Drizzle")
+        {
+            playAnimation(RainyFrames, 3, 5000, 400);
+        }
+        else if (weather_forecast == "Snow")
+        {
+            playAnimation(SnowyFrames, 3, 5000, 600);
+        }
+        else if (weather_forecast == "Mist" || weather_forecast == "Fog" || weather_forecast == "Haze")
+        {
+            playAnimation(FoggyFrames, 2, 5000, 600);
+        }
+        else
+        {
+            // Default to cloudy for unknown conditions
+            playAnimation(CloudyFrames, 4, 5000, 300);
+        }
+    }
 }
