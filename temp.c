@@ -342,8 +342,7 @@ void displayTime(int hours, int minutes, bool showColon)
     };
 
     // Build time display: HH:MM with small 3x5 digits
-    // Layout: 3 + 1 + 3 + 1 + 3 + 1 + 3 = 15 bits wide (centered on 13-bit display)
-    // We'll shift left by 1 bit to center: total 14 bits, but we'll use 13
+    // Layout: 3 + 3 + 1 + 3 + 3 = 13 bits wide (perfect fit!)
 
     for (int row = 0; row < 5; row++)
     {
@@ -352,20 +351,20 @@ void displayTime(int hours, int minutes, bool showColon)
         // Hours tens digit (bits 0-2)
         rowData |= reverseBits3(smallDigits[h1][row] & 0x07);
 
-        // Hours ones digit (bits 4-6)
-        rowData |= reverseBits3(smallDigits[h2][row] & 0x07) << 4;
+        // Hours ones digit (bits 3-5)
+        rowData |= reverseBits3(smallDigits[h2][row] & 0x07) << 3;
 
-        // Colon (bit 7-8) - two dots at rows 1 and 3
+        // Colon (bit 6) - one dot at rows 1 and 3
         if (showColon && (row == 1 || row == 3))
         {
-            rowData |= 0x01 << 7;
+            rowData |= 0x01 << 6;
         }
 
-        // Minutes tens digit (bits 8-10)
-        rowData |= reverseBits3(smallDigits[m1][row] & 0x07) << 8;
+        // Minutes tens digit (bits 7-9)
+        rowData |= reverseBits3(smallDigits[m1][row] & 0x07) << 7;
 
-        // Minutes ones digit (bits 11-13) - but limited to bit 12 for 13-bit display
-        rowData |= reverseBits3(smallDigits[m2][row] & 0x07) << 11;
+        // Minutes ones digit (bits 10-12)
+        rowData |= reverseBits3(smallDigits[m2][row] & 0x07) << 10;
 
         // Pack row into display buffer (centered vertically, starting at row 1)
         if (row == 0)
