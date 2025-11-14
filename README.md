@@ -2,6 +2,51 @@
 
 ![alt text](image.png)
 
-## Early prototype - Arduino Uno Q, two weels with 360 degree movement, USB-C dongle (USB camera, USB speaker, mic), PowereBank 20000 mAh, Python 3.12, Google Gemini Robotics ER 1.5 Preview API
+## Overview
 
-Use wheels to move, mic to listen, speaker to talk, camera to see. Make autonomous decisions. WiFi (API) connection required.
+This project aims to create a highly interactive, autonomous robot utilizing the Google Gemini Robotics ER 1.5 Preview API for decision-making and real-time interaction.
+
+## Current Prototype Specifications
+
+*   **Core Hardware:** Arduino Uno Q (Microcontroller/Motor Control)
+*   **Movement:** Two wheels with 360-degree movement capability (differential drive or similar configuration)
+*   **Peripherals:** USB-C dongle (USB Camera, USB Speaker, Microphone)
+*   **Power:** PowerBank 20000 mAh
+*   **Software Stack:** Python 3.12, Google Gemini Robotics ER 1.5 Preview API
+*   **Connectivity:** WiFi required for API access
+
+**Functionality:** Uses wheels for movement, microphone for audio input, speaker for audio output, and camera for visual input. Capable of making autonomous decisions driven by the AI model.
+
+---
+
+## Design Ideas and Future Considerations
+
+### 1. Hardware Enhancements and Modularity
+
+| Area | Current Status | Proposed Enhancement | Rationale |
+| :--- | :--- | :--- | :--- |
+| **Microcontroller** | Arduino Uno Q | Transition to Raspberry Pi (e.g., Pi 5 or Zero 2 W) or equivalent SBC | Offload Python processing, improve camera/audio stream handling, and provide local processing capability. |
+| **Motor Control** | Integrated with Uno Q | Dedicated Motor Driver Shield (e.g., L298N or specialized drivers) | Better current handling, precision control, and separation of logic/power circuits. |
+| **Sensors** | Camera only | Add LiDAR/Ultrasonic sensors, IMU (Accelerometer/Gyroscope) | Enable robust spatial awareness, obstacle avoidance, and precise movement/pose tracking. |
+| **Power Management** | Single PowerBank | Integrated Power Distribution Board (PDB) with voltage regulation | Ensure stable power for SBC, motors, and peripherals; implement low-power warning system. |
+
+### 2. Software Architecture and Code Structure
+
+The current structure suggests foundational C code (`music.c`, `starwars.c`, `temp.c`) likely handling low-level motor or peripheral control, while `main.py` handles the high-level logic and API interaction.
+
+*   **Refactor C Code:** Consolidate low-level hardware interaction (motor control, sensor reading) into a dedicated library (e.g., `hardware_interface.c`) callable by Python via `ctypes` or similar bindings.
+*   **Python Logic (`main.py`):**
+    *   Implement a clear state machine for autonomous behavior (e.g., Idle, Exploring, Interacting, Charging).
+    *   Separate API communication handling (API client) from local decision-making (Behavior Tree).
+*   **Configuration Management:** Introduce a `config.json` or environment variables for API keys, WiFi settings, and hardware calibration values.
+
+### 3. Interaction and Autonomy Features
+
+*   **Multi-Modal Interaction:** Beyond simple command/response, implement context memory for longer, more meaningful conversations.
+*   **Environmental Mapping:** Integrate Simultaneous Localization and Mapping (SLAM) capabilities (if transitioning to an SBC) to allow the robot to navigate and remember its environment.
+*   **Task Execution:** Design a robust system for handling complex, multi-step instructions (e.g., "Go to the kitchen and report if the coffee machine is on").
+
+### 4. Project Development Setup
+
+*   **Dependency Management:** Utilize a `requirements.txt` file for explicit Python dependency tracking.
+*   **Development Environment:** Expand the `.vscode/settings.json` to include linting (e.g., Black, Pylint) and debugging configurations for easier collaboration and development.
