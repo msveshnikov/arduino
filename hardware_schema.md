@@ -20,10 +20,10 @@ graph TD
 
     subgraph MCU ["MCU (Arduino)"]
         Bridge[Arduino_RouterBridge]
-        Servo1[Servo 1 (Head)]
-        Servo2[Servo 2 (Left Arm)]
-        Servo3[Servo 3 (Right Arm)]
-        Servo4[Servo 4 (Base/Other)]
+        Servo1["Servo 1 (Head)"]
+        Servo2["Servo 2 (Left Arm)"]
+        Servo3["Servo 3 (Right Arm)"]
+        Servo4["Servo 4 (Base/Other)"]
         
         Bridge --> Servo1
         Bridge --> Servo2
