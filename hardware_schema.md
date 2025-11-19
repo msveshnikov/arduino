@@ -31,7 +31,7 @@ graph TD
         Bridge --> Servo4
     end
 
-    Python <==>|USB Serial (115200 baud)| Bridge
+    Python <-->|USB Serial 115200 baud| Bridge
 ```
 
 ## Pinout Configuration
