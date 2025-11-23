@@ -87,6 +87,7 @@ graph TD
     end
 
     Python <-->|USB Serial 115200 baud| Bridge
+```
 
 ## Pinout Configuration
 
