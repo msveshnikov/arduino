@@ -83,11 +83,10 @@ graph TD
 
         Bridge --> ServoL
         Bridge --> ServoR
-        Bridge <-- Sensor
+        Bridge --> Sensor
     end
 
     Python <-->|USB Serial 115200 baud| Bridge
-```
 
 ## Pinout Configuration
 
