@@ -7,6 +7,7 @@ import pyttsx3
 import google.generativeai as genai
 import threading
 import re
+import json
 
 # Configuration
 CAMERA_INDEX = 0
@@ -14,6 +15,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Global state for Bridge communication
 next_command = "NOOP"
+sensor_data = {"distance": 0} # Placeholder for sensor data
 command_lock = threading.Lock()
 
 class RobotBrain:
@@ -27,6 +29,7 @@ class RobotBrain:
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
         self.engine = pyttsx3.init()
+        self.engine.setProperty('volume', 1.0) # Speak loudly
         voices = self.engine.getProperty('voices')
         if voices:
             self.engine.setProperty('voice', voices[0].id) 
@@ -44,10 +47,15 @@ class RobotBrain:
         self.chat = self.model.start_chat(history=[])
         
         self.system_prompt = """
-        You are a robot assistant.
-        To move a servo, include [SERVO: <index>, <angle>].
-        Servo 0: Head, 1: Left Arm, 2: Right Arm.
-        Keep responses concise.
+        You are a robot assistant with two wheels (differential drive) and NO arms or head.
+        You must respond in valid JSON format ONLY.
+        The JSON schema is:
+        {
+            "speech": "text to speak",
+            "left_motor": int (speed -100 to 100),
+            "right_motor": int (speed -100 to 100)
+        }
+        Positive motor values move forward, negative backward.
         """
         self.chat.send_message(self.system_prompt)
 
@@ -82,18 +90,32 @@ class RobotBrain:
             next_command = cmd
 
     def process_response(self, response_text):
-        # Extract commands
-        commands = re.findall(r'\[SERVO:\s*(\d+),\s*(\d+)\]', response_text)
-        for index, angle in commands:
-            # Format: S<index>:<angle>
-            cmd = f"S{index}:{angle}"
-            self.queue_command(cmd)
-            # Note: This simple queue only holds the LAST command. 
-            # For multiple, we'd need a list and pop them.
-            # For now, let's just send the last one or join them.
+        try:
+            # Clean up potential markdown code blocks
+            clean_text = response_text.replace('```json', '').replace('```', '').strip()
+            data = json.loads(clean_text)
             
-        clean_text = re.sub(r'\[SERVO:.*?\]', '', response_text)
-        return clean_text
+            # Handle speech
+            if "speech" in data:
+                self.speak(data["speech"])
+            
+            # Handle motors
+            left = data.get("left_motor", 0)
+            right = data.get("right_motor", 0)
+            
+            # Map -100 to 100 speed to servo angles (0-180)
+            # 90 is stop. 0 is full reverse (or forward depending on mounting), 180 is full forward.
+            # Assuming: 0=Full Back, 90=Stop, 180=Full Fwd
+            l_angle = int(90 + (left * 0.9))
+            r_angle = int(90 + (right * 0.9)) # Might need to invert one side for differential drive
+            
+            # Queue commands
+            cmd = f"L{l_angle};R{r_angle}"
+            self.queue_command(cmd)
+            
+        except json.JSONDecodeError:
+            print(f"Failed to parse JSON: {response_text}")
+            self.speak("I am confused.")
 
     def run_loop(self):
         self.speak("System online.")
@@ -112,19 +134,27 @@ class RobotBrain:
                         pil_img = Image.fromarray(image)
                         inputs.append(pil_img)
                     
+                    # Add sensor data context
+                    global sensor_data
+                    inputs.append(f"Sensor Data: {json.dumps(sensor_data)}")
+                    
                     response = self.chat.send_message(inputs)
-                    clean_text = self.process_response(response.text)
-                    self.speak(clean_text)
+                    self.process_response(response.text)
                 except Exception as e:
                     print(f"Error: {e}")
 
-# Bridge Function called by Arduino
+# Bridge Functions called by Arduino
 def tick():
     global next_command
     with command_lock:
         cmd = next_command
         next_command = "NOOP"
     return cmd
+
+def update_sensors(distance):
+    global sensor_data
+    sensor_data["distance"] = distance
+    return True
 
 if __name__ == "__main__":
     # Start Brain in background thread
@@ -135,6 +165,7 @@ if __name__ == "__main__":
 
     # Register Bridge functions
     Bridge.provide("tick", tick)
+    Bridge.provide("update_sensors", update_sensors)
     
     # Run Bridge App (handles Serial comms)
     print("Starting Bridge App...")

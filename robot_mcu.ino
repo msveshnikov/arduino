@@ -2,23 +2,20 @@
 #include <Servo.h>
 
 // Configuration
-const int MAX_SERVOS = 4;
-const int SERVO_PINS[MAX_SERVOS] = {3, 5, 6, 9}; 
+const int MAX_SERVOS = 2; // Left and Right wheels
+const int LEFT_SERVO_PIN = 5;
+const int RIGHT_SERVO_PIN = 6;
+const int SENSOR_PIN = A0; // Placeholder for sensor
 
-Servo servos[MAX_SERVOS];
+Servo leftServo;
+Servo rightServo;
 
-// Bridge function to set servo angle
-// Usage from Python: Bridge.call("set_servo", index, angle)
+// Bridge function to set servo angle (Legacy support, though we mainly use L/R commands now)
 void set_servo(int index, int angle) {
-  if (index >= 0 && index < MAX_SERVOS) {
-    angle = constrain(angle, 0, 180);
-    servos[index].write(angle);
-    // Return success
-    Bridge.returnResult(true);
-  } else {
-    // Return failure
-    Bridge.returnResult(false);
-  }
+  angle = constrain(angle, 0, 180);
+  if (index == 0) leftServo.write(angle);
+  else if (index == 1) rightServo.write(angle);
+  Bridge.returnResult(true);
 }
 
 void setup() {
@@ -26,44 +23,53 @@ void setup() {
   Bridge.begin();
   
   // Attach servos
-  for (int i = 0; i < MAX_SERVOS; i++) {
-    servos[i].attach(SERVO_PINS[i]);
-    servos[i].write(90); // Default to center
-  }
+  leftServo.attach(LEFT_SERVO_PIN);
+  rightServo.attach(RIGHT_SERVO_PIN);
+  
+  // Stop motors initially (90 is usually stop for continuous rotation servos)
+  leftServo.write(90);
+  rightServo.write(90);
   
   // Register Bridge functions
   Bridge.provide("set_servo", set_servo);
 }
 
 void loop() {
-  // In the Bridge architecture (polling), the MCU usually asks the MPU for commands
-  // via Bridge.call(). However, for simple servo control, it's often better
-  // if the MPU pushes commands. 
-  // BUT, the user asked to follow the `temp.c` example which uses `Bridge.call("get_temperature")`.
-  // So we will implement a "tick" where the MCU asks "what should I do?".
-  
+  // 1. Ask Python for commands
   String command;
-  // Call Python function "tick"
-  // Expected return: "S0:90" or "NOOP" or multiple commands separated by ;
   if (Bridge.call("tick").result(command)) {
     if (command != "NOOP" && command.length() > 0) {
       parseAndExecute(command);
     }
   }
   
-  // Small delay to prevent flooding
+  // 2. Read Sensors and send to Python
+  int sensorValue = analogRead(SENSOR_PIN);
+  // We can send this every loop or periodically. Let's do it every loop for now.
+  Bridge.call("update_sensors", sensorValue);
+  
+  // Small delay
   delay(50);
 }
 
 void parseAndExecute(String cmdString) {
-  // Simple parser for "S0:90"
-  // If multiple commands, we'd need more complex parsing, but let's keep it simple for now
-  // or assume Python sends one command per tick for simplicity, or we split by ';'
+  // Format: "L<angle>;R<angle>" e.g. "L100;R80"
   
-  int separatorIndex = cmdString.indexOf(':');
-  if (cmdString.startsWith("S") && separatorIndex > 1) {
-    int servoIndex = cmdString.substring(1, separatorIndex).toInt();
-    int angle = cmdString.substring(separatorIndex + 1).toInt();
-    set_servo(servoIndex, angle);
+  int separator = cmdString.indexOf(';');
+  if (separator > 0) {
+    String leftCmd = cmdString.substring(0, separator);
+    String rightCmd = cmdString.substring(separator + 1);
+    
+    if (leftCmd.startsWith("L")) {
+      int angle = leftCmd.substring(1).toInt();
+      leftServo.write(constrain(angle, 0, 180));
+    }
+    
+    if (rightCmd.startsWith("R")) {
+      int angle = rightCmd.substring(1).toInt();
+      rightServo.write(constrain(angle, 0, 180));
+    }
+  } else {
+      // Fallback for single commands if any
   }
 }
